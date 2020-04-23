@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:erdbeben/models/quake.dart';
 import 'package:erdbeben/network/network.dart';
-import 'package:erdbeben/ui/earthquakeListPage.dart';
+import 'package:flutter_speed_dial/flutter_speed_dial.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 class EarthquakeMap extends StatefulWidget {
@@ -11,34 +11,88 @@ class EarthquakeMap extends StatefulWidget {
   State<StatefulWidget> createState() => new EarthquakeMapState();
 }
 
-class EarthquakeMapState extends State<EarthquakeMap> {
+class EarthquakeMapState extends State<EarthquakeMap> with SingleTickerProviderStateMixin {
+  double _magnitude;
   Future<Quake> _quakesData;
   List<Marker> _earthquakeList = <Marker>[];
   Completer<GoogleMapController> _controller = Completer();
 
   @override
   void initState() {
-    _quakesData = Network().getAllQuakes();
+    _magnitude = 1.0;
+    _quakesData = Network().getAllQuakes(_magnitude);
     super.initState();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(),
-      floatingActionButton: FloatingActionButton(
-        child: const Text('2.5+'),
-        onPressed: () {
-          findQuakes();
-        },
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          bottom: TabBar(
+            tabs: [
+              Tab(text: 'Karte'),
+              Tab(text: 'Liste'),
+            ],
+          ),
+        ),
+        body: TabBarView(
+          physics: NeverScrollableScrollPhysics(),
+          children: <Widget>[
+            Stack(
+              children: <Widget>[
+                _buildEarthquakeMap(context),
+              ],
+            ),
+            Text('Hallo'),
+          ],
+        ),
+        floatingActionButton: _buildFloatingActionButton(),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      bottomNavigationBar: _buildBottomAppBar(context),
-      body: Stack(
-        children: <Widget>[
-          _buildEarthquakeMap(context),
-        ],
-      ),
+    );
+  }
+
+  _buildFloatingActionButton() {
+    return SpeedDial(
+      animatedIcon: AnimatedIcons.menu_close,
+      backgroundColor: const Color(0xFF121212),
+      foregroundColor: Colors.white,
+      curve: Curves.bounceIn,
+      overlayOpacity: 0.0,
+      child: Icon(Icons.menu),
+      children: [
+        SpeedDialChild(
+          child: Center(
+            child: Text(
+              '1.0+',
+              style: TextStyle(color: Colors.green),
+            ),
+          ),
+          backgroundColor: const Color(0xFF121212),
+          onTap: () => _findQuakes(1.0),
+        ),
+        SpeedDialChild(
+          child: Center(
+            child: Text(
+              '2.5+',
+              style: TextStyle(color: Colors.yellow),
+            ),
+          ),
+          backgroundColor: const Color(0xFF121212),
+          onTap: () => _findQuakes(2.5),
+        ),
+        SpeedDialChild(
+          child: Center(
+            child: Text(
+              '4.5+',
+              style: TextStyle(color: Colors.orange),
+            ),
+          ),
+          backgroundColor: const Color(0xFF121212),
+          onTap: () => _findQuakes(4.5),
+        ),
+      ],
     );
   }
 
@@ -50,89 +104,55 @@ class EarthquakeMapState extends State<EarthquakeMap> {
       child: GoogleMap(
         mapType: MapType.hybrid,
         zoomControlsEnabled: false,
+        mapToolbarEnabled: false,
         onMapCreated: (GoogleMapController controller) {
           _controller.complete(controller);
         },
-        initialCameraPosition: CameraPosition(target: LatLng(52.519735, 13.4046413)),   // Berlin
+        initialCameraPosition: CameraPosition(target: LatLng(52.519735, 13.4046413)), // Berlin
         markers: Set<Marker>.of(_earthquakeList),
       ),
     );
   }
 
-  /// Erstellt die untere Navigationsleiste mit Karte und Liste Buttons.
-  _buildBottomAppBar(BuildContext context) {
-    return BottomAppBar(
-      shape: CircularNotchedRectangle(),
-      notchMargin: 8,
-      child: Row(
-        mainAxisSize: MainAxisSize.max,
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: <Widget>[
-          FlatButton(
-            onPressed: () {
-              setState(() {
-                Navigator.push(context, MaterialPageRoute(builder: (context) => EarthquakeMap()));
-              });
-            },
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                Icon(Icons.public),
-                Text(
-                  'Karte',
-                  style: TextStyle(height: 1.3),
-                ),
-              ],
-            ),
-          ),
-          FlatButton(
-            onPressed: () {
-              setState(() {
-                Navigator.push(context, MaterialPageRoute(builder: (context) => EarthquakeList()));
-              });
-            },
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                Icon(Icons.storage),
-                Text(
-                  'Liste',
-                  style: TextStyle(height: 1.3),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  findQuakes() {
+  void _findQuakes(double magnitude) {
     setState(() {
       _earthquakeList.clear();
-      _handleResponse();
+      _handleResponse(magnitude);
     });
   }
 
   /// Setzt alle Erdbeben Marker die dann auf der Google Map angezeigt werden.
-  void _handleResponse() {
+  void _handleResponse(double magnitude) {
     setState(
       () {
         _quakesData.then(
           (quakes) => [
             quakes.features.forEach(
               (quake) => [
-                _earthquakeList.add(Marker(
-                    markerId: MarkerId(quake.id),
-                    infoWindow: InfoWindow(title: quake.properties.mag.toString(), snippet: quake.properties.place),
-                    icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueMagenta),
-                    position: LatLng(quake.geometry.coordinates[1], quake.geometry.coordinates[0]),
-                    onTap: () {}))
+                if (quake.properties.mag >= magnitude)
+                  {
+                    _earthquakeList.add(Marker(
+                        markerId: MarkerId(quake.id),
+                        infoWindow: InfoWindow(title: quake.properties.mag.toString(), snippet: quake.properties.place),
+                        icon: _setMarkerColor(quake.properties.mag),
+                        position: LatLng(quake.geometry.coordinates[1], quake.geometry.coordinates[0]),
+                        onTap: () {}))
+                  }
               ],
             ),
           ],
         );
       },
     );
+  }
+
+  BitmapDescriptor _setMarkerColor(double magnitude) {
+    if (magnitude >= 0.0 && magnitude < 2.5) {
+      return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen);
+    } else if (magnitude >= 2.5 && magnitude < 4.5) {
+      return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow);
+    } else {
+      return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange);
+    }
   }
 }
