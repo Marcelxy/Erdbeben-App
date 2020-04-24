@@ -225,13 +225,13 @@ class Properties {
 
 class Geometry {
   String type;
-  List<double> coordinates;
+  List<num> coordinates;
 
   Geometry({this.type, this.coordinates});
 
   Geometry.fromJson(Map<String, dynamic> json) {
     type = json['type'];
-    coordinates = json['coordinates'].cast<double>();
+    coordinates = json['coordinates'].cast<num>();
   }
 
   Map<String, dynamic> toJson() {

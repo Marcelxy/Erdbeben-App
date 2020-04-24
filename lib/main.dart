@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:erdbeben/ui/earthquakeMapPage.dart';
+import 'package:erdbeben/ui/earthquakePage.dart';
 
 void main() => runApp(
       MaterialApp(
@@ -7,6 +7,6 @@ void main() => runApp(
         darkTheme: ThemeData.dark(),
         debugShowCheckedModeBanner: false,
         title: 'Erdbeben',
-        home: EarthquakeMap(),
+        home: EarthquakeApp(),
       ),
     );
